@@ -533,12 +533,18 @@ func (s *ServerService) GetStatus(lastStatus *Status) *Status {
 		status.Cpu = util
 	}
 
-	status.CpuCores, err = cpu.Counts(false)
-	if err != nil {
-		logger.Warning("get cpu cores count failed:", err)
+	if capacity, limited := sys.CgroupCPUCapacity(); limited {
+		// The API exposes integer core/thread counts. Round fractional CPU
+		// quotas up so a 500m container still displays one usable CPU.
+		status.CpuCores = max(1, int(math.Ceil(capacity)))
+		status.LogicalPro = status.CpuCores
+	} else {
+		status.CpuCores, err = cpu.Counts(false)
+		if err != nil {
+			logger.Warning("get cpu cores count failed:", err)
+		}
+		status.LogicalPro = runtime.NumCPU()
 	}
-
-	status.LogicalPro = runtime.NumCPU()
 
 	if status.CpuSpeedMhz = s.cachedCpuSpeedMhz; s.cachedCpuSpeedMhz == 0 && time.Since(s.lastCpuInfoAttempt) > 5*time.Minute {
 		s.lastCpuInfoAttempt = time.Now()
@@ -575,12 +581,17 @@ func (s *ServerService) GetStatus(lastStatus *Status) *Status {
 	}
 
 	// Memory stats
-	memInfo, err := mem.VirtualMemory()
-	if err != nil {
-		logger.Warning("get virtual memory failed:", err)
+	if current, limit, limited := sys.CgroupMemoryUsage(); limited {
+		status.Mem.Current = current
+		status.Mem.Total = limit
 	} else {
-		status.Mem.Current = memInfo.Used
-		status.Mem.Total = memInfo.Total
+		memInfo, err := mem.VirtualMemory()
+		if err != nil {
+			logger.Warning("get virtual memory failed:", err)
+		} else {
+			status.Mem.Current = memInfo.Used
+			status.Mem.Total = memInfo.Total
+		}
 	}
 
 	swapInfo, err := mem.SwapMemory()

@@ -86,6 +86,10 @@ var (
 // /proc/stat. First call initializes and returns 0; subsequent calls return
 // busy/total * 100. Uses HostProc so HOST_PROC overrides (containers) apply.
 func CPUPercentRaw() (float64, error) {
+	if percent, limited, err := cgroupCPUPercent(); limited {
+		return percent, err
+	}
+
 	f, err := os.Open(HostProc("stat"))
 	if err != nil {
 		return 0, err

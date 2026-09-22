@@ -2,6 +2,7 @@ package job
 
 import (
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
+	"github.com/mhsanaei/3x-ui/v3/internal/util/sys"
 
 	"github.com/shirou/gopsutil/v4/mem"
 )
@@ -16,6 +17,18 @@ func NewCheckMemJob() *CheckMemJob {
 
 // Run checks memory usage and publishes a memory.high event with raw metric data.
 func (j *CheckMemJob) Run() {
+	if current, limit, limited := sys.CgroupMemoryUsage(); limited {
+		if EventBus != nil {
+			EventBus.Publish(eventbus.Event{
+				Type: eventbus.EventMemoryHigh,
+				Data: &eventbus.SystemMetricData{
+					Percent: float64(current) * 100 / float64(limit),
+				},
+			})
+		}
+		return
+	}
+
 	memInfo, err := mem.VirtualMemory()
 	if err != nil || memInfo == nil {
 		return
