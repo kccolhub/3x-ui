@@ -452,8 +452,10 @@ func buildBatchTestConfig(items []*httpBatchItem, allOutbounds []any, ports []in
 		"rules":          rules,
 	})
 
+	// Probes run in a short-lived core: retain upstream handshake and dial
+	// diagnostics in the panel log when the HTTP client only reports a reset.
 	logJSON, _ := json.Marshal(map[string]any{
-		"loglevel": "warning",
+		"loglevel": "debug",
 		"access":   "none",
 		"error":    "",
 		"dnsLog":   false,
